@@ -1,121 +1,179 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { io } from "socket.io-client";
-import './App.css';
+import React, { useState, useEffect } from "react";
 
-const socket = io("http://localhost:3001");
-
+const GAME_HEIGHT = 500;
 const GAME_WIDTH = 400;
-const GAME_HEIGHT = 600;
-const GRAVITY = 0.6;
-const JUMP = -10;
-const PIPE_WIDTH = 50;
+
+const GRAVITY = 0.5;
+const JUMP_FORCE = -8;
+
+const PIPE_WIDTH = 60;
 const PIPE_GAP = 150;
-const PIPE_SPEED = 3;
 
 function App() {
-  const canvasRef = useRef(null);
-  const [birdY, setBirdY] = useState(GAME_HEIGHT / 2);
+  const [birdY, setBirdY] = useState(250);
   const [velocity, setVelocity] = useState(0);
-  const [pipes, setPipes] = useState([]);
-  const [score, setScore] = useState(0);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [pipeX, setPipeX] = useState(GAME_WIDTH);
+  const [pipeHeight, setPipeHeight] = useState(200);
   const [gameOver, setGameOver] = useState(false);
 
+  // Main game loop
   useEffect(() => {
-    socket.on('flap', handleFlap);
-    return () => socket.off('flap', handleFlap);
-  }, []);
+    if (!gameStarted || gameOver) return;
 
-  const handleFlap = () => {
-    setVelocity(JUMP);
-  };
+    const interval = setInterval(() => {
+      setVelocity((v) => v + GRAVITY);
 
+      setBirdY((y) => y + velocity);
+
+      setPipeX((x) => {
+        if (x < -PIPE_WIDTH) {
+          setPipeHeight(Math.floor(Math.random() * 250) + 50);
+          return GAME_WIDTH;
+        }
+        return x - 3;
+      });
+    }, 20);
+
+    return () => clearInterval(interval);
+  }, [gameStarted, velocity, gameOver]);
+
+  // Collision detection
+  useEffect(() => {
+    const hitTop = birdY <= 0;
+    const hitBottom = birdY >= GAME_HEIGHT - 40;
+
+    const hitPipe =
+      pipeX < 90 &&
+      pipeX + PIPE_WIDTH > 50 &&
+      (birdY < pipeHeight || birdY > pipeHeight + PIPE_GAP);
+
+    if (hitTop || hitBottom || hitPipe) {
+      setGameOver(true);
+      setGameStarted(false);
+    }
+  }, [birdY, pipeX, pipeHeight]);
+
+  // Spacebar control
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.code === 'Space') handleFlap();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+      if (e.code !== "Space") return;
 
-  useEffect(() => {
-    const ctx = canvasRef.current.getContext('2d');
-
-    const reset = () => {
-      setBirdY(GAME_HEIGHT / 2);
-      setVelocity(0);
-      setPipes([{ x: GAME_WIDTH, top: Math.random() * (GAME_HEIGHT - PIPE_GAP - 100) }]);
-      setScore(0);
-      setGameOver(false);
-    };
-
-    const loop = () => {
-      if(gameOver) return;
-
-      setVelocity(v => v + GRAVITY);
-      setBirdY(y => {
-        const newY = y + velocity;
-        if (newY > GAME_HEIGHT || newY < 0) {
-          setGameOver(true);
-          return y;
-        }
-        return newY;
-      });
-
-      setPipes(prev => {
-        let newPipes = prev.map(p => ({ ...p, x: p.x - PIPE_SPEED }));
-        if (newPipes[newPipes.length -1].x < GAME_WIDTH - 200) {
-          newPipes.push({ x: GAME_WIDTH, top: Math.random() * (GAME_HEIGHT - PIPE_GAP - 100) });
-        }
-        newPipes = newPipes.filter(p => p.x + PIPE_WIDTH > 0);
-        return newPipes;
-      });
-
-      pipes.forEach(p => {
-        if (p.x < 50 && p.x + PIPE_WIDTH > 0) {
-          if (birdY < p.top || birdY > p.top + PIPE_GAP) {
-            setGameOver(true);
-          } else {
-            setScore(s => s + 0.01);
-          }
-        }
-      });
-
-      draw(ctx);
-      requestAnimationFrame(loop);
-    };
-
-    const draw = (ctx) => {
-      ctx.fillStyle = '#70c5ce';
-      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-      ctx.fillStyle = 'yellow';
-      ctx.fillRect(50, birdY, 30, 30);
-
-      ctx.fillStyle = 'green';
-      pipes.forEach(p => {
-        ctx.fillRect(p.x, 0, PIPE_WIDTH, p.top);
-        ctx.fillRect(p.x, p.top + PIPE_GAP, PIPE_WIDTH, GAME_HEIGHT - p.top - PIPE_GAP);
-      });
-
-      ctx.fillStyle = 'white';
-      ctx.font = '24px Arial';
-      ctx.fillText("Score: " + Math.floor(score), 10, 30);
-
-      if(gameOver){
-        ctx.fillStyle = 'red';
-        ctx.font = '48px Arial';
-        ctx.fillText("GAME OVER", 50, GAME_HEIGHT/2);
+      if (gameOver) {
+        setBirdY(250);
+        setVelocity(0);
+        setPipeX(GAME_WIDTH);
+        setGameOver(false);
+        return;
       }
+
+      if (!gameStarted) {
+        setGameStarted(true);
+      }
+
+      setVelocity(JUMP_FORCE);
     };
 
-    reset();
-    requestAnimationFrame(loop);
-  }, [velocity, birdY, pipes, score, gameOver]);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [gameStarted, gameOver]);
 
   return (
-    <div className="App">
-      <h1>Flappy Bird ESP32</h1>
-      <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} />
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#70c5ce",
+      }}
+    >
+      <div
+        style={{
+          width: GAME_WIDTH,
+          height: GAME_HEIGHT,
+          position: "relative",
+          overflow: "hidden",
+          border: "4px solid black",
+          backgroundColor: "skyblue",
+        }}
+      >
+        {/* Start Message */}
+        {!gameStarted && !gameOver && (
+          <div
+            style={{
+              position: "absolute",
+              top: 20,
+              width: "100%",
+              textAlign: "center",
+              zIndex: 5,
+            }}
+          >
+            <h2>Press Space to Start</h2>
+          </div>
+        )}
+
+        {/* Bird */}
+        <div
+          style={{
+            position: "absolute",
+            left: 50,
+            top: birdY,
+            width: 40,
+            height: 40,
+            backgroundColor: "yellow",
+            zIndex: 2,
+          }}
+        />
+
+        {/* Top Pipe */}
+        <div
+          style={{
+            position: "absolute",
+            left: pipeX,
+            top: 0,
+            width: PIPE_WIDTH,
+            height: pipeHeight,
+            backgroundColor: "green",
+            zIndex: 1,
+          }}
+        />
+
+        {/* Bottom Pipe */}
+        <div
+          style={{
+            position: "absolute",
+            left: pipeX,
+            top: pipeHeight + PIPE_GAP,
+            width: PIPE_WIDTH,
+            height: GAME_HEIGHT,
+            backgroundColor: "green",
+            zIndex: 1,
+          }}
+        />
+
+        {/* Game Over Overlay (TOP LAYER) */}
+        {gameOver && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "rgba(0,0,0,0.5)",
+              zIndex: 100,
+            }}
+          >
+            <h1 style={{ color: "white" }}>
+              Game Over - Press Space to Restart
+            </h1>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
