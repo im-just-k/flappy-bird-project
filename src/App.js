@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import chickenImg from "./assets/chickenSprite.png";
 
 const GAME_HEIGHT = 500;
 const GAME_WIDTH = 400;
@@ -8,6 +9,10 @@ const JUMP_FORCE = -8;
 
 const PIPE_WIDTH = 60;
 const PIPE_GAP = 150;
+
+// Invisible hitbox for collision detection
+const BIRD_WIDTH = 40;
+const BIRD_HEIGHT = 40;
 
 function App() {
   const [birdY, setBirdY] = useState(250);
@@ -23,7 +28,6 @@ function App() {
 
     const interval = setInterval(() => {
       setVelocity((v) => v + GRAVITY);
-
       setBirdY((y) => y + velocity);
 
       setPipeX((x) => {
@@ -38,15 +42,15 @@ function App() {
     return () => clearInterval(interval);
   }, [gameStarted, velocity, gameOver]);
 
-  // Collision detection
+  // Collision detection using invisible hitbox
   useEffect(() => {
     const hitTop = birdY <= 0;
-    const hitBottom = birdY >= GAME_HEIGHT - 40;
+    const hitBottom = birdY + BIRD_HEIGHT >= GAME_HEIGHT;
 
     const hitPipe =
-      pipeX < 90 &&
+      pipeX < 50 + BIRD_WIDTH &&
       pipeX + PIPE_WIDTH > 50 &&
-      (birdY < pipeHeight || birdY > pipeHeight + PIPE_GAP);
+      (birdY < pipeHeight || birdY + BIRD_HEIGHT > pipeHeight + PIPE_GAP);
 
     if (hitTop || hitBottom || hitPipe) {
       setGameOver(true);
@@ -60,6 +64,7 @@ function App() {
       if (e.code !== "Space") return;
 
       if (gameOver) {
+        // Reset game
         setBirdY(250);
         setVelocity(0);
         setPipeX(GAME_WIDTH);
@@ -109,20 +114,23 @@ function App() {
               zIndex: 5,
             }}
           >
-            <h2>Press Space to Start</h2>
+            <h2 style={{ margin: 0 }}>Press Space to Start</h2>
           </div>
         )}
 
-        {/* Bird */}
-        <div
+        {/* Chicken sprite */}
+        <img
+          src={chickenImg}
+          alt="chicken"
           style={{
             position: "absolute",
             left: 50,
-            top: birdY,
-            width: 40,
-            height: 40,
-            backgroundColor: "yellow",
+            top: birdY - 10, // adjust to center over hitbox
+            width: 60,
+            height: 60,
             zIndex: 2,
+            userSelect: "none",
+            pointerEvents: "none",
           }}
         />
 
@@ -152,7 +160,7 @@ function App() {
           }}
         />
 
-        {/* Game Over Overlay (TOP LAYER) */}
+        {/* Game Over Overlay */}
         {gameOver && (
           <div
             style={{
@@ -168,9 +176,19 @@ function App() {
               zIndex: 100,
             }}
           >
-            <h1 style={{ color: "white" }}>
+            <span
+              style={{
+                color: "white",
+                fontFamily: "'Arial Black', Arial, sans-serif",
+                fontSize: "40px",
+                fontWeight: 900,
+                textAlign: "center",
+                lineHeight: 1.2,
+                textShadow: "2px 2px 4px black",
+              }}
+            >
               Game Over - Press Space to Restart
-            </h1>
+            </span>
           </div>
         )}
       </div>
