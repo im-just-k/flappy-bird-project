@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import chickenImg from "./assets/chickenSprite.png";
 
 const GAME_HEIGHT = 500;
@@ -10,7 +10,6 @@ const JUMP_FORCE = -8;
 const PIPE_WIDTH = 60;
 const PIPE_GAP = 150;
 
-// Invisible hitbox for collision detection
 const BIRD_WIDTH = 40;
 const BIRD_HEIGHT = 40;
 
@@ -21,6 +20,9 @@ function App() {
   const [pipeX, setPipeX] = useState(GAME_WIDTH);
   const [pipeHeight, setPipeHeight] = useState(200);
   const [gameOver, setGameOver] = useState(false);
+
+  const [timeSurvived, setTimeSurvived] = useState(0);
+  const startTimeRef = useRef(null);
 
   // Main game loop
   useEffect(() => {
@@ -42,7 +44,21 @@ function App() {
     return () => clearInterval(interval);
   }, [gameStarted, velocity, gameOver]);
 
-  // Collision detection using invisible hitbox
+  // Timer logic (separate from physics loop)
+  useEffect(() => {
+    if (!gameStarted || gameOver) return;
+
+    startTimeRef.current = Date.now();
+
+    const timer = setInterval(() => {
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      setTimeSurvived(elapsed);
+    }, 100); // updates 10x per second
+
+    return () => clearInterval(timer);
+  }, [gameStarted, gameOver]);
+
+  // Collision detection
   useEffect(() => {
     const hitTop = birdY <= 0;
     const hitBottom = birdY + BIRD_HEIGHT >= GAME_HEIGHT;
@@ -64,10 +80,10 @@ function App() {
       if (e.code !== "Space") return;
 
       if (gameOver) {
-        // Reset game
         setBirdY(250);
         setVelocity(0);
         setPipeX(GAME_WIDTH);
+        setTimeSurvived(0);
         setGameOver(false);
         return;
       }
@@ -103,7 +119,24 @@ function App() {
           backgroundColor: "skyblue",
         }}
       >
-        {/* Start Message */}
+        {/* Live Timer */}
+        {gameStarted && !gameOver && (
+          <div
+            style={{
+              position: "absolute",
+              top: 10,
+              left: 10,
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "20px",
+              textShadow: "2px 2px 4px black",
+              zIndex: 10,
+            }}
+          >
+            Time: {timeSurvived.toFixed(1)}s
+          </div>
+        )}
+
         {!gameStarted && !gameOver && (
           <div
             style={{
@@ -118,14 +151,13 @@ function App() {
           </div>
         )}
 
-        {/* Chicken sprite */}
         <img
           src={chickenImg}
           alt="chicken"
           style={{
             position: "absolute",
             left: 50,
-            top: birdY - 10, // adjust to center over hitbox
+            top: birdY - 10,
             width: 60,
             height: 60,
             zIndex: 2,
@@ -143,7 +175,6 @@ function App() {
             width: PIPE_WIDTH,
             height: pipeHeight,
             backgroundColor: "green",
-            zIndex: 1,
           }}
         />
 
@@ -156,11 +187,10 @@ function App() {
             width: PIPE_WIDTH,
             height: GAME_HEIGHT,
             backgroundColor: "green",
-            zIndex: 1,
           }}
         />
 
-        {/* Game Over Overlay */}
+        {/* Game Over */}
         {gameOver && (
           <div
             style={{
@@ -170,25 +200,28 @@ function App() {
               width: "100%",
               height: "100%",
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               backgroundColor: "rgba(0,0,0,0.5)",
               zIndex: 100,
+              color: "white",
+              fontFamily: "'Arial Black', Arial, sans-serif",
+              textAlign: "center",
+              textShadow: "2px 2px 4px black",
             }}
           >
-            <span
-              style={{
-                color: "white",
-                fontFamily: "'Arial Black', Arial, sans-serif",
-                fontSize: "40px",
-                fontWeight: 900,
-                textAlign: "center",
-                lineHeight: 1.2,
-                textShadow: "2px 2px 4px black",
-              }}
-            >
-              Game Over - Press Space to Restart
-            </span>
+            <div style={{ fontSize: "40px", fontWeight: 900 }}>
+              Game Over
+            </div>
+
+            <div style={{ fontSize: "18px", marginTop: 10 }}>
+              Time Survived: {timeSurvived.toFixed(1)} seconds
+            </div>
+
+            <div style={{ marginTop: 15 }}>
+              Press Space to Restart
+            </div>
           </div>
         )}
       </div>
