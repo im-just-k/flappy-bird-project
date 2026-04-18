@@ -1,2 +1,2 @@
 # Flappy Bird Project
-React + ESP32 Wi-Fi button Flappy Bird clone.
+A Flappy Bird clone made with REACT
